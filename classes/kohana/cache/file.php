@@ -72,8 +72,8 @@ class Kohana_Cache_File extends Cache implements Cache_GarbageCollect {
 		// Setup parent
 		parent::__construct($config);
 
-		$directory = Arr::get($this->_config, 'cache_dir', Kohana::$cache_dir);
-		$this->_cache_dir = new SplFileInfo($directory);
+                $directory = Arr::get($this->_config, 'cache_dir', Kohana::$cache_dir);
+                $this->_cache_dir = new SplFileInfo($directory);
 
 		// If the defined directory is a file, get outta here
 		if ($this->_cache_dir->isFile())
@@ -81,6 +81,12 @@ class Kohana_Cache_File extends Cache implements Cache_GarbageCollect {
 			throw new Cache_Exception('Unable to create cache directory as a file already exists : :resource', array(':resource' => $this->_cache_dir->getRealPath()));
 		}
 
+                // create the directory if it doesn't exist
+                if ( !$this->_cache_dir->isDir() )
+                {
+			$this->_cache_dir = $this->_make_directory($directory, 0777, TRUE);
+                }
+                
 		// Check the read status of the directory
 		if ( ! $this->_cache_dir->isReadable())
 		{
@@ -127,10 +133,7 @@ class Kohana_Cache_File extends Cache implements Cache_GarbageCollect {
 			}
 			else
 			{
-				// Open the file and parse data
-				$created  = $file->getMTime();
-				$data     = $file->openFile();
-				$lifetime = $data->fgets();
+                                $data = $file->openFile();
 
 				// If we're at the EOF at this point, corrupted!
 				if ($data->eof())
@@ -138,15 +141,8 @@ class Kohana_Cache_File extends Cache implements Cache_GarbageCollect {
 					throw new Cache_Exception(__METHOD__.' corrupted cache file!');
 				}
 
-				$cache = '';
-
-				while ($data->eof() === FALSE)
-				{
-					$cache .= $data->fgets();
-				}
-
 				// Test the expiry
-				if (($created + (int) $lifetime) < time())
+				if ($this->_is_expired($file, $data))
 				{
 					// Delete the file
 					$this->_delete_file($file, NULL, TRUE);
@@ -154,6 +150,13 @@ class Kohana_Cache_File extends Cache implements Cache_GarbageCollect {
 				}
 				else
 				{
+                                        $cache = '';
+
+                                        while ($data->eof() === FALSE)
+                                        {
+                                                $cache .= $data->fgets();
+        				}
+
 					return unserialize($cache);
 				}
 			}
@@ -323,11 +326,8 @@ class Kohana_Cache_File extends Cache implements Cache_GarbageCollect {
 					// Otherwise...
 					else
 					{
-						// Assess the file expiry to flag it for deletion
-						$json = $file->openFile('r')->current();
-						$data = json_decode($json);
-						$delete = $data->expiry < time();
-					}
+                                                $delete = $this->_is_expired($file);					
+                                        }
 
 					// If the delete flag is set delete file
 					if ($delete === TRUE)
@@ -362,7 +362,7 @@ class Kohana_Cache_File extends Cache implements Cache_GarbageCollect {
 						// Create new file resource
 						$fp = new SplFileInfo($files->getRealPath());
 						// Delete the file
-						$this->_delete_file($fp);
+						$this->_delete_file($fp, $retain_parent_directory, $ignore_errors, $only_expired);
 					}
 
 					// Move the file pointer on
@@ -414,7 +414,30 @@ class Kohana_Cache_File extends Cache implements Cache_GarbageCollect {
 		}
 	}
 
-	/**
+	/** 
+	 * Test if the file is expired.
+	 *
+	 * Provide $data to remove the first line containing lifetime.
+	 * If no $data is provided, it will be fetched from the $file.
+	 *
+	 * @param   SplFileInfo    $file  file to be tested
+	 * @param   SplFileObject  $data  file data
+	 * @return  boolean
+	 */
+	protected function _is_expired(SplFileInfo $file, SplFileObject $data = null)
+	{
+		if ($data === null)
+		{
+			$data = $file->openFile();
+		}
+
+		$lifetime = $data->fgets();
+		$created  = $file->getMTime();
+
+		return ($created + (int) $lifetime) < time();
+	}
+        
+        /**
 	 * Resolves the cache directory real path from the filename
 	 *
 	 *      // Get the realpath of the cache folder
@@ -442,7 +465,7 @@ class Kohana_Cache_File extends Cache implements Cache_GarbageCollect {
 	 */
 	protected function _make_directory($directory, $mode = 0777, $recursive = FALSE, $context = NULL)
 	{
-	// call mkdir according to the availability of a passed $context param
+		// call mkdir according to the availability of a passed $context param
 		$mkdir_result = $context ?
 			mkdir($directory, $mode, $recursive, $context) :
 			mkdir($directory, $mode, $recursive);
@@ -451,7 +474,6 @@ class Kohana_Cache_File extends Cache implements Cache_GarbageCollect {
 		{
 			throw new Kohana_Cache_Exception('Failed to create the defined cache directory : :directory', array(':directory' => $directory));
 		}
-		
 		chmod($directory, $mode);
 
 		return new SplFileInfo($directory);
