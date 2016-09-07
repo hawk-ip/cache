@@ -72,21 +72,8 @@ class Kohana_Cache_File extends Cache implements Cache_GarbageCollect {
 		// Setup parent
 		parent::__construct($config);
 
-		try
-		{
-			$directory = Arr::get($this->_config, 'cache_dir', Kohana::$cache_dir);
-			$this->_cache_dir = new SplFileInfo($directory);
-		}
-		// PHP < 5.3 exception handle
-		catch (ErrorException $e)
-		{
-			$this->_cache_dir = $this->_make_directory($directory, 0777, TRUE);
-		}
-		// PHP >= 5.3 exception handle
-		catch (UnexpectedValueException $e)
-		{
-			$this->_cache_dir = $this->_make_directory($directory, 0777, TRUE);
-		}
+		$directory = Arr::get($this->_config, 'cache_dir', Kohana::$cache_dir);
+		$this->_cache_dir = new SplFileInfo($directory);
 
 		// If the defined directory is a file, get outta here
 		if ($this->_cache_dir->isFile())
@@ -455,10 +442,16 @@ class Kohana_Cache_File extends Cache implements Cache_GarbageCollect {
 	 */
 	protected function _make_directory($directory, $mode = 0777, $recursive = FALSE, $context = NULL)
 	{
-		if ( ! mkdir($directory, $mode, $recursive, $context))
+	// call mkdir according to the availability of a passed $context param
+		$mkdir_result = $context ?
+			mkdir($directory, $mode, $recursive, $context) :
+			mkdir($directory, $mode, $recursive);
+		// throw an exception if unsuccessful
+		if ( ! $mkdir_result)
 		{
-			throw new Cache_Exception('Failed to create the defined cache directory : :directory', array(':directory' => $directory));
+			throw new Kohana_Cache_Exception('Failed to create the defined cache directory : :directory', array(':directory' => $directory));
 		}
+		
 		chmod($directory, $mode);
 
 		return new SplFileInfo($directory);
