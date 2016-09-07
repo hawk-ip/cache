@@ -72,21 +72,7 @@ class Kohana_Cache_File extends Cache implements Cache_GarbageCollect {
 		// Setup parent
 		parent::__construct($config);
 
-		try
-		{
-			$directory = Arr::get($this->_config, 'cache_dir', Kohana::$cache_dir);
-			$this->_cache_dir = new SplFileInfo($directory);
-		}
-		// PHP < 5.3 exception handle
-		catch (ErrorException $e)
-		{
-			$this->_cache_dir = $this->_make_directory($directory, 0777, TRUE);
-		}
-		// PHP >= 5.3 exception handle
-		catch (UnexpectedValueException $e)
-		{
-			$this->_cache_dir = $this->_make_directory($directory, 0777, TRUE);
-		}
+		$directory = Arr::get($this->_config, 'cache_dir', Kohana::$cache_dir);
 
 		// If the defined directory is a file, get outta here
 		if ($this->_cache_dir->isFile())
@@ -94,6 +80,12 @@ class Kohana_Cache_File extends Cache implements Cache_GarbageCollect {
 			throw new Cache_Exception('Unable to create cache directory as a file already exists : :resource', array(':resource' => $this->_cache_dir->getRealPath()));
 		}
 
+                // create the directory if it doesn't exist
+                if ( !$this->_cache_dir->isDir() )
+                {
+			$this->_cache_dir = $this->_make_directory($directory, 0777, TRUE);
+                }
+                
 		// Check the read status of the directory
 		if ( ! $this->_cache_dir->isReadable())
 		{
