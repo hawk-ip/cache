@@ -361,8 +361,8 @@ class Kohana_Cache_File extends Cache implements Cache_GarbageCollect {
 					{
 						// Create new file resource
 						$fp = new SplFileInfo($files->getRealPath());
-						// Delete the file
-						$this->_delete_file($fp, $retain_parent_directory, $ignore_errors, $only_expired);
+						// Delete the directory, ignore errors
+						$this->_delete_file($fp, false, true, $only_expired);
 					}
 
 					// Move the file pointer on
@@ -430,7 +430,7 @@ class Kohana_Cache_File extends Cache implements Cache_GarbageCollect {
 		{
 			$data = $file->openFile();
 		}
-
+                
 		$lifetime = $data->fgets();
 		$created  = $file->getMTime();
 
